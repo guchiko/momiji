@@ -11,7 +11,7 @@ class MyClient(discord.Client):
         c = message.content
         print(c)
         # don't respond to ourselves
-        if message.author == self.user:
+        if message.author == self.user or message.author.bot or message.author == client.user:
             return
 
         if c == 'ping':
