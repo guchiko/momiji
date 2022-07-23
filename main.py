@@ -39,9 +39,10 @@ def settoken():
         return "ok"
 
 if __name__ == '__main__':
+    print("hi")
     if os.path.exists('token.txt'):
         with open('token.txt', "r", encoding="utf-8") as f:
             token = f.read()
             threading.Thread(target=lambda: client.run(token)).start()
             print("asdfasdf")
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
