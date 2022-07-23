@@ -35,6 +35,7 @@ def settoken():
         with open('token.txt', "w", encoding="utf-8") as f:
             f.write(request.form['t'])
             threading.Thread(target=lambda: client.run(token)).start()
+            print("asdfasdf2")
         return "ok"
 
 if __name__ == '__main__':
