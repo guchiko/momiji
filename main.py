@@ -26,7 +26,8 @@ cur.execute("""CREATE TABLE IF NOT EXISTS mp3s(
    mp3url TEXT PRIMARY KEY,
    normtonfc TEXT,
    tag TEXT,
-   gurl TEXT);
+   gurl TEXT,
+   nlvl TEXT);
 """)
 
 conn.commit()
@@ -39,8 +40,10 @@ for m in gramList:
     cur.execute("INSERT INTO grams VALUES(?, ?, ?);", (m, gramList[m]['jap'], gramList[m]['eng']))
 conn.commit()
 for m in mp3List:
-    cur.execute("INSERT INTO mp3s VALUES(?, ?, ?, ?);",
-                (m, unicodedata.normalize('NFC', m), mp3List[m]['tag'], mp3List[m]['Gurl']))
+    nlvl = re.search('/audio/N\d/', m)
+    nlvl = nlvl[0][-3:-1] if nlvl and nlvl[0] else ''
+    cur.execute("INSERT INTO mp3s VALUES(?, ?, ?, ?, ?);",
+                (m, unicodedata.normalize('NFC', m), mp3List[m]['tag'], mp3List[m]['Gurl'],nlvl))
 conn.commit()
 
 
@@ -59,7 +62,7 @@ class MyClient(discord.Client):
                 (not (c.isascii())):
             c = unicodedata.normalize('NFC', c)
             cur.execute("""SELECT * FROM mp3s
-                      where normtonfc like '%""" + c + """%'""")
+                      where normtonfc like '%""" + c + """%' order by tag asc, nlvl desc""")
             result = cur.fetchmany(5)
             str = '\n'.join([escape(f[0]) for f in result])
             if len(result) >= 1:
