@@ -17,6 +17,7 @@ conn = sqlite3.connect(":memory:")
 cur = conn.cursor()
 
 
+
 def escape(s):
     r = s.replace('：', urllib.parse.quote('：'))
     r = r.replace(' ', urllib.parse.quote(' '))
@@ -55,6 +56,8 @@ class MyClient(discord.Client):
             return
         if c == 'ping':
             await message.channel.send('pong')
+        if c == '!quit':
+            await client.close()
         if (not (bool(re.search('[а-яА-Я]', c)))) & \
                 (not (c.isascii())):
             c = unicodedata.normalize('NFC', c)
@@ -70,7 +73,9 @@ class MyClient(discord.Client):
 
 @app.route('/')
 def hello_world():
-    return 'Hello'
+    print(client.latency)
+    if str(client.status)=='online' and client.is_closed()!=True:
+        return str(client.latency)
 
 # client = MyClient()
 
