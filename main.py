@@ -17,34 +17,25 @@ def escape(s):
     r = r.replace(' ', urllib.parse.quote(' '))
     return r
 
-
-cur.execute("""CREATE TABLE IF NOT EXISTS grams(
-   gurl TEXT PRIMARY KEY,
-   jap TEXT,
-   eng TEXT);
-""")
-cur.execute("""CREATE TABLE IF NOT EXISTS mp3s(
+cur.execute("""CREATE TABLE IF NOT EXISTS data(
    mp3url TEXT PRIMARY KEY,
    normtonfc TEXT,
    tag TEXT,
    gurl TEXT,
-   nlvl TEXT);
+   nlvl TEXT,
+   jptext TEXT,
+   entext TEXT);
 """)
-
 conn.commit()
-with open('mp3List.pkl', 'rb') as f:
-    mp3List = pickle.load(f)
-with open('grams.pkl', 'rb') as f:
-    gramList = pickle.load(f)
+with open('data.pkl', 'rb') as f:
+    dataList = pickle.load(f)
 
-for m in gramList:
-    cur.execute("INSERT INTO grams VALUES(?, ?, ?);", (m, gramList[m]['jap'], gramList[m]['eng']))
-conn.commit()
-for m in mp3List:
+for m in dataList:
     nlvl = re.search('/audio/N\d/', m)
     nlvl = nlvl[0][-3:-1] if nlvl and nlvl[0] else ''
-    cur.execute("INSERT INTO mp3s VALUES(?, ?, ?, ?, ?);",
-                (m, unicodedata.normalize('NFC', m), mp3List[m]['tag'], mp3List[m]['Gurl'],nlvl))
+    cur.execute("INSERT INTO data VALUES(?, ?, ?, ?, ?, ?, ?);",
+                (m, unicodedata.normalize('NFC', m), dataList[m]['tag'], dataList[m]['Gurl'],nlvl,
+                 str(dataList[m]['jptext']),str(dataList[m]['entext'])))
 conn.commit()
 
 
@@ -62,12 +53,15 @@ class MyClient(discord.Client):
         if (not (bool(re.search('[а-яА-Я]', c)))) & \
                 (not (c.isascii())):
             c = unicodedata.normalize('NFC', c)
-            cur.execute("""SELECT * FROM mp3s
+            cur.execute("""SELECT mp3url,jptext,entext FROM data
                       where normtonfc like '%""" + c + """%' order by tag asc, nlvl desc""")
             result = cur.fetchmany(5)
-            str = '\n'.join([escape(f[0]) for f in result])
+            # str = '\n'.join([escape(f[0]) for f in result])
             if len(result) >= 1:
-                await message.channel.send(str)
+                for s in result:
+                    await message.channel.send(escape(s[0])+'\n'+s[1]+'\n'+s[2])
+                # await message.channel.send(str)
+
 
 
 # client = MyClient()
