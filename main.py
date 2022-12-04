@@ -6,7 +6,12 @@ import sqlite3
 import pickle
 import re
 import unicodedata
+from flask import Flask
+import threading
 
+
+
+app = Flask(__name__)
 token = os.environ['token']
 conn = sqlite3.connect(":memory:")
 cur = conn.cursor()
@@ -63,6 +68,9 @@ class MyClient(discord.Client):
                 # await message.channel.send(str)
 
 
+@app.route('/')
+def hello_world():
+    return 'Hello'
 
 # client = MyClient()
 
@@ -71,4 +79,5 @@ intents.message_content = True
 client = MyClient(intents=intents)
 
 if __name__ == '__main__':
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)).start()
     client.run(token)
