@@ -1,5 +1,6 @@
 import os
 import discord
+from discord.ext import commands
 import urllib
 import sqlite3
 import pickle
@@ -69,7 +70,11 @@ class MyClient(discord.Client):
                 await message.channel.send(str)
 
 
-client = MyClient()
+# client = MyClient()
+
+intents = discord.Intents.default()
+intents.message_content = True
+client = MyClient(intents=intents)
 
 if __name__ == '__main__':
     client.run(token)
