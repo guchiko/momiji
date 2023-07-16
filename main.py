@@ -310,7 +310,7 @@ class MyClient(discord.Client):
         if reaction.count > 1 and reaction.me is True and reaction.emoji in {"▶",'⌚'}:
             s = ytmp3s[reaction.message.id]
             MORE = 5 if reaction.emoji == '⌚' else 0
-            await ytdl(self, reaction.message, f'https://www.youtube.com/watch?v={s[0]-0.5} {s[1]}:{s[1] + s[2]+MORE}')
+            await ytdl(self, reaction.message, f'https://www.youtube.com/watch?v={s[0]} {s[1]-0.5}:{s[1] + s[2]+MORE}')
 
 
     async def on_message(self, message):
