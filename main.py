@@ -5,7 +5,6 @@ import sqlite3
 import re
 import unicodedata
 import yt_dlp  # yt-dlp https://github.com/yt-dlp/yt-dlp
-# from discord.ext.commands import bot
 from pydub import AudioSegment
 import requests
 from bs4 import BeautifulSoup
@@ -16,6 +15,8 @@ from requests import get
 from flask import Flask, send_from_directory, redirect#, request
 import threading
 
+# from discord.ext.commands import bot
+# import signal
 # from discord.ext import commands
 # import pickle
 # import math
@@ -186,9 +187,9 @@ async def ytdl(s, m, c):
                     dargs.append("-to")
                     dargs.append(str(end / 1000))
                 print(f'=========vol: {vol}')
-                if vol != 0:
-                    # todo vol
-                    None
+                # if vol != 0:
+                #     # todo vol
+                #     None
                 ydl_opts["external_downloader_args"] = {"ffmpeg_i": dargs}
 
             if not os.path.isfile(filename):
@@ -417,7 +418,13 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = MyClient(intents=intents)
 
+# def shutdown(q,w):
+#     print('shutdown')
+#     client.close()
+
 if __name__ == '__main__':
+    # signal.signal(signal.SIGINT, shutdown)
+    # signal.signal(signal.SIGTERM, shutdown)
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(lurkedport), debug=False, use_reloader=False),
                      daemon=True).start()
     client.run(token)
