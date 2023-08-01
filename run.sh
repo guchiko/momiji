@@ -2,6 +2,8 @@
 
 
 echo|pwd
+echo ##teamcity[buildDetachedFromAgent]
+echo '##teamcity[buildDetachedFromAgent]'
 cd /home/desu/momiji
 
 until $(curl --output /dev/null --silent --head --fail https://github.com/); do
