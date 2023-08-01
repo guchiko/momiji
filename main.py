@@ -5,7 +5,7 @@ import sqlite3
 import re
 import unicodedata
 import yt_dlp  # yt-dlp https://github.com/yt-dlp/yt-dlp
-from discord.ext.commands import bot
+# from discord.ext.commands import bot
 from pydub import AudioSegment
 import requests
 from bs4 import BeautifulSoup
@@ -13,7 +13,7 @@ from discord.ext import tasks
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api import _errors  # youtube-transcript-api
 from requests import get
-from flask import Flask, send_from_directory, redirect
+from flask import Flask, send_from_directory, redirect#, request
 import threading
 
 # from discord.ext import commands
@@ -41,16 +41,8 @@ cury.execute("""CREATE TABLE IF NOT EXISTS ytsubs(
    duration FLOAT);
 """)
 ytmp3s = {}
-bpromp3s = {}
-
-
-def reinitbpromp3s():
-    global bpromp3s
-    mp3list = os.listdir('bpro/')
-    bpromp3s = dict(zip(mp3list, range(len(mp3list))))
-
-
-reinitbpromp3s()
+mp3list = os.listdir('bpro/')
+bpromp3s_shorts = dict(zip(mp3list, range(len(mp3list))))
 
 
 async def mal_watch(c):
@@ -126,9 +118,6 @@ def get_vid_from_url(c):
 
 async def ytdl(s, m, c):
     try:
-        if c == 'yt':
-            await m.channel.send("yt_url !s2 !e5.5")
-            return
         start = 0
         end = 0
         vol = 0
@@ -140,6 +129,7 @@ async def ytdl(s, m, c):
                 float(
                     re.search(r'\s!s-?[,\.\d]+', c).group(0)[3:].replace(',', '.'))
                 * 1000)
+            start = 0 if start < 0 else start
         if ' !e' in c:
             end = int(
                 float(
@@ -160,28 +150,64 @@ async def ytdl(s, m, c):
             await m.channel.send('shiturl?')
         ytu = 'https://www.youtube.com/watch?v=' + ytu
 
-        # pt = pytube.YouTube(ytu)
-        filename = ytid + ".mp3"
-        filename = 'mp3/' + filename
+
+        filename = 'mp3/' + ytid + ".mp3"
         if not os.path.exists(os.getcwd() + '/mp3'):
             os.makedirs(os.getcwd() + '/mp3', exist_ok=True)
         if not os.path.exists(os.getcwd() + '/cut'):
             os.makedirs(os.getcwd() + '/cut', exist_ok=True)
 
+
+
+
+        if('!x' in c):
+            # external downloader
+            filename='mp3/' +ytid+'.mp3'
+            ydl_opts = {
+                'format': 'm4a/bestaudio/best',
+                'outtmpl': (filename[:-4]),
+                'postprocessors': [{  # Extract audio using ffmpeg
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                }]
+            }
+            if start != 0 or end != 0 or vol != 0:
+                filename='cut/'+filename[4:]
+                filename = filename[:-4] + '_cut' + str(start / 1000) + 'to' + str(end / 1000) + filename[-4:]
+                ydl_opts['outtmpl']=(filename[:-4])
+
+                ydl_opts["external_downloader"] = "ffmpeg"
+                # ydl_opts["external_downloader_args"] = {"ffmpeg_i": ["-ss", str(start/1000), "-to", str(end/1000)]}
+                dargs = []
+                if start != 0:
+                    dargs.append("-ss")
+                    dargs.append(str(start / 1000))
+                if end != 0:
+                    dargs.append("-to")
+                    dargs.append(str(end / 1000))
+                print(f'=========vol: {vol}')
+                if vol != 0:
+                    # todo vol
+                    None
+                ydl_opts["external_downloader_args"] = {"ffmpeg_i": dargs}
+
+            if not os.path.isfile(filename):
+                yt_dlp.YoutubeDL(ydl_opts).download(ytid)
+                await m.channel.send(file=discord.File(filename))
+            return
+
+
+
         if not os.path.isfile(filename):
             await m.channel.send("downloading...", delete_after=5)
             info = yt_dlp.YoutubeDL().extract_info(ytu, download=False)
             duration = info.get('duration')
-            # if pt.length > 420 and not '!f' in c:
             if duration > 420 and '!f' not in c:
                 await m.channel.send("too long, use !f to force")
                 return
-            # df = pt.streams.filter(only_audio=True).order_by('abr').desc().first().download('mp3')
-            # os.rename(df, filename)
             ydl_opts = {
                 'format': 'm4a/bestaudio/best',
                 'outtmpl': (filename[:-4]),
-                # 'outtmpl': ('/dls/%(id)s'),
                 'postprocessors': [{  # Extract audio using ffmpeg
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -191,8 +217,6 @@ async def ytdl(s, m, c):
             await ytsubs(None, None, c, True)
 
         if start != 0 or end != 0 or vol != 0:
-            if start < 0:
-                start = 0
             await m.channel.send("converting...", delete_after=3)
             sound = AudioSegment.from_file(filename)
             filename = filename[:-4] + '_cut' + str(start / 1000) + 'to' + str(end / 1000) + filename[-4:]
@@ -275,7 +299,6 @@ async def bpro(s, m, c, howmany=3, startfrom=0):
                 if i >= startfrom:
                     furl = escape(s[0])
                     fname = furl[furl.rfind('/') + 1:]
-                    print(fname)
                     if not os.path.isfile('bpro/' + fname):
                         print(f'downloading {fname}')
                         get_response = requests.get(furl, stream=True)
@@ -283,16 +306,30 @@ async def bpro(s, m, c, howmany=3, startfrom=0):
                             for chunk in get_response.iter_content(chunk_size=1024):
                                 if chunk:  # filter out keep-alive new chunks
                                     f.write(chunk)
-                        bpromp3s[fname] = len(bpromp3s)
+                        bpromp3s_shorts[fname] = len(bpromp3s_shorts)
                     if os.path.isfile('bpro/' + fname):
-                        print(f'mp3 found locally for fname {fname}')
-                        print(bpromp3s[fname])
-                        furl = f'http://{ip}:{lurkedport}/{str(bpromp3s[fname])}'
-                    await m.channel.send('👨‍🎓  ' + furl + '\t' + s[3] + '\n' + s[1] + '\n' + re.sub("<.*?>", "", s[2]))
+                        print(f'mp3 found locally for fname {fname}: {bpromp3s_shorts[fname]}')
+                        furl = f'http://{ip}:{lurkedport}/{str(bpromp3s_shorts[fname])}'
+                    await m.channel.send(
+                        '👨‍🎓  ' + furl + '\t' + s[3] + '\n' + s[1] + '\n' + re.sub("<.*?>", "", s[2]))
 
     except Exception as e:
         await m.channel.send(f"shit happened in bpro: {e}")
         print(f"shit happened in bpro: {e}")
+
+
+async def yt(s, m, c, howmany=3, startfrom=0):
+    cury.execute(f"Select vid, sub, sub_nobrackets, start, duration "
+                 f"from ytsubs s where sub like '%{c}%' or sub_nobrackets like '%{c}%'")
+    result = cury.fetchmany(howmany)
+    if len(result) >= 1:
+        for i, s in enumerate(result):
+            if i >= startfrom:
+                sendedmsg = await m.channel.send(
+                    '<https://www.youtube.com/watch?v=' + s[0] + '&t=' + str(int(s[3])) + '>\n' + s[2])
+                await sendedmsg.add_reaction("▶")
+                await sendedmsg.add_reaction("⌚")
+                ytmp3s[sendedmsg.id] = [s[0], s[3], s[4]]
 
 
 class MyClient(discord.Client):
@@ -307,14 +344,17 @@ class MyClient(discord.Client):
         self.mal_watcher.start()
 
     async def on_reaction_add(self, reaction, user):
-        if reaction.count > 1 and reaction.me is True and reaction.emoji in {"▶",'⌚'}:
+        if reaction.count > 1 and reaction.me is True and reaction.emoji in {"▶", '⌚'}:
             s = ytmp3s[reaction.message.id]
             MORE = 5 if reaction.emoji == '⌚' else 0
-            await ytdl(self, reaction.message, f'https://www.youtube.com/watch?v={s[0]} {s[1]-0.5}:{s[1] + s[2]+MORE}')
-
+            await ytdl(self, reaction.message,
+                       f'https://www.youtube.com/watch?v={s[0]} {s[1] - 0.5}:{s[1] + s[2] + MORE}')
+            c = reaction.message.content
+            await reaction.message.edit(content=c[c.find('\n')+1:])
 
     async def on_message(self, message):
         c = message.content
+        c = unicodedata.normalize('NFC', c)
         if message.author == self.user or message.author.bot or message.author == client.user:
             return
         print(message)
@@ -322,28 +362,32 @@ class MyClient(discord.Client):
             return
         if c == 'ping':
             await message.channel.send('pong')
-        if ('youtube.com' in c or 'youtu.be' in c or 'yt' == c) and not c.startswith('s '):
+        if c == '?' or c == 'halp' or c == 'help':
+            await message.channel.send("""download: yt_url !s2 !e5.5 or yt_url 2:5.5
+            grab subs: s yt_url
+            bpro: b# text
+            yt: y# text""")
+        if ('youtube.com' in c or 'youtu.be' in c) and not c.lower().startswith('s '):
             await ytdl(self, message, c)
-        if ('youtube.com' in c or 'youtu.be' in c or 'yt' == c) and c.startswith('s '):
+        if ('youtube.com' in c or 'youtu.be' in c) and c.lower().startswith('s '):
             await ytsubs(self, message, c)
         if c == '!quit':
             await client.close()
-        if (not (bool(re.search('[а-яА-Я]', c)))) & \
-                (not (c.isascii())):
-            c = unicodedata.normalize('NFC', c)
-            # bpro
+        # bpro
+        if c.lower().startswith('b '):
+            await bpro(self, message, c[2:], 5)
+        if c.lower().startswith('b'):
+            if re.search(r'^b\d+?\s', c):
+                await bpro(self, message, c[c.find(' ')+1:], int(re.search(r'^b\d+?\s', c).group(0)[1:-1]))
+        # yt
+        if c.lower().startswith('y '):
+            await yt(self, message, c[2:], 5)
+        if c.lower().startswith('y') and re.search(r'^y\d+?\s', c):
+            await yt(self, message, c[c.find(' ')+1:], int(re.search(r'^y\d+?\s', c).group(0)[1:-1]))
+        # bpro+yt
+        if ((not (bool(re.search('[а-яА-Я]', c)))) and (not (c.isascii()))):
             await bpro(self, message, c)
-            # yt
-            cury.execute(f"Select vid, sub, sub_nobrackets, start, duration "
-                         f"from ytsubs s where sub like '%{c}%' or sub_nobrackets like '%{c}%'")
-            result = cury.fetchmany(3)
-            if len(result) >= 1:
-                for s in result:
-                    sendedmsg = await message.channel.send(
-                        '<https://www.youtube.com/watch?v=' + s[0] + '&t=' + str(int(s[3])) + '>\n' + s[2])
-                    await sendedmsg.add_reaction("▶")
-                    await sendedmsg.add_reaction("⌚")
-                    ytmp3s[sendedmsg.id] = [s[0], s[3], s[4]]
+            await yt(self, message, c)
 
 
 @app.route('/')
@@ -355,13 +399,15 @@ def hello_world():
 
 @app.route('/bpro/<path:path>')
 def send_bpromp3(path):
+    # if 'Discordbot' not in request.headers.get('User-Agent'):
+    #     print(f'send_bpromp3:path={path}')
     return send_from_directory('bpro', path)
 
 
 @app.route('/<short_id>')
 def redirect_url(short_id):
-    r = next((url for url, shid in bpromp3s.items() if str(shid) == short_id), None)
-    print(f'unshort {short_id} to{r}')
+    r = next((url for url, shid in bpromp3s_shorts.items() if str(shid) == short_id), None)
+    # print(f'unshort {short_id} to{r}')
     if r:
         return redirect(('/bpro/' + r), 301)
     return f'shithappened  short_id:{short_id} unshorted:{r}'
