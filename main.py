@@ -12,7 +12,7 @@ from discord.ext import tasks
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api import _errors  # youtube-transcript-api
 from requests import get
-from flask import Flask, send_from_directory, redirect#, request
+from flask import Flask, send_from_directory, redirect  # , request
 import threading
 
 # from discord.ext.commands import bot
@@ -44,7 +44,6 @@ cury.execute("""CREATE TABLE IF NOT EXISTS ytsubs(
 ytmp3s = {}
 mp3list = os.listdir('bpro/')
 bpromp3s_shorts = dict(zip(mp3list, range(len(mp3list))))
-
 
 async def mal_watch(c):
     try:
@@ -151,84 +150,51 @@ async def ytdl(s, m, c):
             await m.channel.send('shiturl?')
         ytu = 'https://www.youtube.com/watch?v=' + ytu
 
-
         filename = 'mp3/' + ytid + ".mp3"
         if not os.path.exists(os.getcwd() + '/mp3'):
             os.makedirs(os.getcwd() + '/mp3', exist_ok=True)
         if not os.path.exists(os.getcwd() + '/cut'):
             os.makedirs(os.getcwd() + '/cut', exist_ok=True)
 
+        # if ('!x' in c):
+        # external downloader
+        filename = 'mp3/' + ytid + '.mp3'
+        ydl_opts = {
+            'format': 'm4a/bestaudio/best',
+            'outtmpl': (filename[:-4]),
+            'postprocessors': [{  # Extract audio using ffmpeg
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+            }]
+        }
+        if start != 0 or end != 0:
+            filename = 'cut/' + filename[4:]
+            filename = filename[:-4] + '_cut' + str(start / 1000) + 'to' + str(end / 1000) + filename[-4:]
+            ydl_opts['outtmpl'] = (filename[:-4])
 
-
-
-        if('!x' in c):
-            # external downloader
-            filename='mp3/' +ytid+'.mp3'
-            ydl_opts = {
-                'format': 'm4a/bestaudio/best',
-                'outtmpl': (filename[:-4]),
-                'postprocessors': [{  # Extract audio using ffmpeg
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                }]
-            }
-            if start != 0 or end != 0 or vol != 0:
-                filename='cut/'+filename[4:]
-                filename = filename[:-4] + '_cut' + str(start / 1000) + 'to' + str(end / 1000) + filename[-4:]
-                ydl_opts['outtmpl']=(filename[:-4])
-
-                ydl_opts["external_downloader"] = "ffmpeg"
-                # ydl_opts["external_downloader_args"] = {"ffmpeg_i": ["-ss", str(start/1000), "-to", str(end/1000)]}
-                dargs = []
-                if start != 0:
-                    dargs.append("-ss")
-                    dargs.append(str(start / 1000))
-                if end != 0:
-                    dargs.append("-to")
-                    dargs.append(str(end / 1000))
-                print(f'=========vol: {vol}')
-                # if vol != 0:
-                #     # todo vol
-                #     None
-                ydl_opts["external_downloader_args"] = {"ffmpeg_i": dargs}
-
-            if not os.path.isfile(filename):
-                yt_dlp.YoutubeDL(ydl_opts).download(ytid)
-                await m.channel.send(file=discord.File(filename))
-            return
-
-
+            ydl_opts["external_downloader"] = "ffmpeg"
+            # ydl_opts["external_downloader_args"] = {"ffmpeg_i": ["-ss", str(start/1000), "-to", str(end/1000)]}
+            dargs = []
+            if start != 0:
+                dargs.append("-ss")
+                dargs.append(str(start / 1000))
+            if end != 0:
+                dargs.append("-to")
+                dargs.append(str(end / 1000))
+            ydl_opts["external_downloader_args"] = {"ffmpeg_i": dargs}
 
         if not os.path.isfile(filename):
             await m.channel.send("downloading...", delete_after=5)
-            info = yt_dlp.YoutubeDL().extract_info(ytu, download=False)
-            duration = info.get('duration')
-            if duration > 420 and '!f' not in c:
-                await m.channel.send("too long, use !f to force")
-                return
-            ydl_opts = {
-                'format': 'm4a/bestaudio/best',
-                'outtmpl': (filename[:-4]),
-                'postprocessors': [{  # Extract audio using ffmpeg
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                }]
-            }
-            yt_dlp.YoutubeDL(ydl_opts).download(ytu)
-            await ytsubs(None, None, c, True)
+            yt_dlp.YoutubeDL(ydl_opts).download(ytid)
 
-        if start != 0 or end != 0 or vol != 0:
-            await m.channel.send("converting...", delete_after=3)
+        if vol != 0:
+            await m.channel.send("vol adjusting...", delete_after=3)
             sound = AudioSegment.from_file(filename)
-            filename = filename[:-4] + '_cut' + str(start / 1000) + 'to' + str(end / 1000) + filename[-4:]
-            sound = sound[start if start != 0 else None:end if end != 0 else None]
-            if vol != 0:
-                filename = filename[:-4] + 'v' + str(vol) + filename[-4:]
-                sound = sound + vol
-            sound.export('cut/' + filename[4:], format="mp3")
-            filename = 'cut/' + filename[4:]
-
+            sound = sound + vol
+            filename = filename[:-4] + f'v{vol}' + filename[-4:]
+            sound.export(filename, format="mp3")
         await m.channel.send(file=discord.File(filename))
+
     except Exception as e:
         await m.channel.send(f"shit happened in ytdl: {e}")
         print(f"shit happened in ytdl: {e}")
@@ -288,7 +254,8 @@ async def ytsubs(s, m, c, silent=False):
             print(f"{ytu} распотрошён, вставлено {len(subs)}")
             if not silent:
                 await m.channel.send(f"{ytu} распотрошён, вставлено {len(subs)}")
-
+            return len(subs)
+    return 0
 
 async def bpro(s, m, c, howmany=3, startfrom=0):
     try:
@@ -351,7 +318,7 @@ class MyClient(discord.Client):
             await ytdl(self, reaction.message,
                        f'https://www.youtube.com/watch?v={s[0]} {s[1] - 0.5}:{s[1] + s[2] + MORE}')
             c = reaction.message.content
-            await reaction.message.edit(content=c[c.find('\n')+1:])
+            await reaction.message.edit(content=c[c.find('\n') + 1:])
 
     async def on_message(self, message):
         c = message.content
@@ -379,14 +346,21 @@ class MyClient(discord.Client):
             await bpro(self, message, c[2:], 5)
         if c.lower().startswith('b'):
             if re.search(r'^b\d+?\s', c):
-                await bpro(self, message, c[c.find(' ')+1:], int(re.search(r'^b\d+?\s', c).group(0)[1:-1]))
+                await bpro(self, message, c[c.find(' ') + 1:], int(re.search(r'^b\d+?\s', c).group(0)[1:-1]))
         # yt
         if c.lower().startswith('y '):
             await yt(self, message, c[2:], 5)
         if c.lower().startswith('y') and re.search(r'^y\d+?\s', c):
-            await yt(self, message, c[c.find(' ')+1:], int(re.search(r'^y\d+?\s', c).group(0)[1:-1]))
+            await yt(self, message, c[c.find(' ') + 1:], int(re.search(r'^y\d+?\s', c).group(0)[1:-1]))
         # bpro+yt
         if ((not (bool(re.search('[а-яА-Я]', c)))) and (not (c.isascii()))):
+            cury.execute(f"Select count(1) from ytsubs s where sub like '%{c}%' or sub_nobrackets like '%{c}%'")
+            cnty = cury.fetchone()[0]
+
+            cur.execute(f"""SELECT count(1) FROM data
+                        where normtonfc like '%{c}%' order by tag asc, nlvl desc""")
+            cntb = cur.fetchone()[0]
+            await message.channel.send(f"bpro: {cntb} yt: {cnty}")
             await bpro(self, message, c)
             await yt(self, message, c)
 
