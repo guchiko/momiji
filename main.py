@@ -1,6 +1,6 @@
 import os
 import discord
-import urllib
+from urllib import parse
 import sqlite3
 import re
 import unicodedata
@@ -45,6 +45,7 @@ ytmp3s = {}
 mp3list = os.listdir('bpro/')
 bpromp3s_shorts = dict(zip(mp3list, range(len(mp3list))))
 
+
 async def mal_watch(c):
     try:
         url = "https://myanimelist.net/animelist/kli5an?status=6"
@@ -76,8 +77,8 @@ async def mal_watch(c):
 
 
 def escape(s):
-    r = s.replace('：', urllib.parse.quote('：'))
-    r = r.replace(' ', urllib.parse.quote(' '))
+    r = s.replace('：', parse.quote('：'))
+    r = r.replace(' ', parse.quote(' '))
     return r
 
 
@@ -257,6 +258,17 @@ async def ytsubs(s, m, c, silent=False):
             return len(subs)
     return 0
 
+
+async def ytsubs_multy(s, m, c):
+    pasted = 0
+    ripped = 0
+    vids = c.split(',')
+    for vid in vids:
+        pasted += await ytsubs(s, m, 'https://www.youtube.com/watch?v=' + vid, silent=True)
+        ripped += 1
+    await m.channel.send(f"прислано {len(vids)},распотрошёно {ripped}, вставлено {pasted}")
+
+
 async def bpro(s, m, c, howmany=3, startfrom=0):
     try:
         cur.execute("""SELECT mp3url,jptext,entext,nlvl FROM data
@@ -333,6 +345,7 @@ class MyClient(discord.Client):
         if c == '?' or c == 'halp' or c == 'help':
             await message.channel.send("""download: yt_url !s2 !e5.5 or yt_url 2:5.5
             grab subs: s yt_url
+            grab many subs: ss yt_id,yt_id
             bpro: b# text
             yt: y# text""")
         if ('youtube.com' in c or 'youtu.be' in c) and not c.lower().startswith('s '):
@@ -347,6 +360,9 @@ class MyClient(discord.Client):
         if c.lower().startswith('b'):
             if re.search(r'^b\d+?\s', c):
                 await bpro(self, message, c[c.find(' ') + 1:], int(re.search(r'^b\d+?\s', c).group(0)[1:-1]))
+        # grab many subs
+        if c.lower().startswith('ss '):
+            await ytsubs_multy(self, message, c[3:])
         # yt
         if c.lower().startswith('y '):
             await yt(self, message, c[2:], 5)
